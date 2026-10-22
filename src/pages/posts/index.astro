@@ -1,0 +1,173 @@
+---
+import { getEmDashCollection, getTermsForEntries } from "emdash";
+import { Image } from "emdash/ui";
+import Base from "../../layouts/Base.astro";
+
+const cursor = Astro.url.searchParams.get("cursor") || undefined;
+const {
+	entries: posts,
+	cacheHint,
+	nextCursor,
+} = await getEmDashCollection("posts", {
+	orderBy: { published_at: "desc" },
+	limit: 12,
+	cursor,
+});
+if (Astro.cache?.enabled) Astro.cache.set(cacheHint);
+
+const [tagsByEntry, categoriesByEntry] = await Promise.all([
+	getTermsForEntries(
+		"posts",
+		posts.map((p) => p.data.id),
+		"tag",
+	),
+	getTermsForEntries(
+		"posts",
+		posts.map((p) => p.data.id),
+		"category",
+	),
+]);
+
+const postsWithTerms = posts.map((post) => ({
+	post,
+	tags: tagsByEntry.get(post.data.id) ?? [],
+	category: categoriesByEntry.get(post.data.id)?.[0],
+}));
+---
+
+<Base title="All Posts" description="Explore all articles and publications.">
+	<header class="page-header">
+		<span class="page-eyebrow">The Blog</span>
+		<h1 class="page-title">All Posts</h1>
+		<p class="page-lead">A collection of thinking, updates, and deep dives.</p>
+	</header>
+
+	{
+		postsWithTerms.length === 0 ? (
+			<div class="empty-state">
+				<p class="empty-message">No posts found.</p>
+				<a href="/" class="btn btn-outline">&larr; Return home</a>
+			</div>
+		) : (
+			<ul class="post-list">
+				{postsWithTerms.map(({ post, tags, category }) => (
+					<li class="post-list-item">
+						{post.data.featured_image && (
+							<a
+								href={`/posts/${post.id}`}
+								class="post-list-thumb"
+								{...post.edit.featured_image}
+							>
+								<Image image={post.data.featured_image} />
+							</a>
+						)}
+						<div class="post-list-content">
+							<div class="meta-group">
+								{category && (
+									<a href={`/category/${category.slug}`} class="badge badge-accent">
+										{category.label}
+									</a>
+								)}
+								{post.data.publishedAt && (
+									<time datetime={post.data.publishedAt.toISOString()}>
+										{post.data.publishedAt.toLocaleDateString("en-US", {
+											year: "numeric",
+											month: "short",
+											day: "numeric",
+										})}
+									</time>
+								)}
+							</div>
+
+							<h2 class="post-list-title">
+								<a href={`/posts/${post.id}`} {...post.edit.title}>
+									{post.data.title}
+								</a>
+							</h2>
+
+							{post.data.excerpt && (
+								<p class="post-list-excerpt" {...post.edit.excerpt}>
+									{post.data.excerpt}
+								</p>
+							)}
+
+							{tags.length > 0 && (
+								<div class="tag-cloud">
+									{tags.map((t) => (
+										<a href={`/tag/${t.slug}`} class="badge badge-neutral">
+											#{t.label}
+										</a>
+									))}
+								</div>
+							)}
+						</div>
+					</li>
+				))}
+			</ul>
+		)
+	}
+
+	<nav class="pagination-nav" aria-label="Pagination">
+		{cursor ? (
+			<a href="/posts" class="btn btn-outline">&larr; First page</a>
+		) : (
+			<span />
+		)}
+		{
+			nextCursor && (
+				<a
+					href={`/posts?cursor=${encodeURIComponent(nextCursor)}`}
+					class="btn btn-primary"
+				>
+					Next page &rarr;
+				</a>
+			)
+		}
+	</nav>
+</Base>
+
+<style>
+	.page-header {
+		margin-bottom: var(--space-10);
+		padding-bottom: var(--space-8);
+		border-bottom: 2px solid var(--color-primary);
+	}
+
+	.page-eyebrow {
+		display: inline-block;
+		font-family: var(--font-display);
+		font-size: var(--font-size-xs);
+		font-weight: var(--font-weight-bold);
+		text-transform: uppercase;
+		letter-spacing: var(--tracking-wider);
+		color: var(--color-accent);
+		margin-bottom: var(--space-2);
+	}
+
+	.page-title {
+		font-size: var(--font-size-4xl);
+		color: var(--color-primary);
+		letter-spacing: var(--tracking-tighter);
+		margin-bottom: var(--space-2);
+	}
+
+	.page-lead {
+		font-size: var(--font-size-lg);
+		color: var(--color-text-muted);
+		margin-bottom: 0;
+	}
+
+	.empty-state {
+		text-align: center;
+		padding: var(--space-16) var(--space-4);
+		background-color: var(--color-surface);
+		border: 1px dashed var(--color-border-strong);
+		border-radius: var(--radius-md);
+	}
+
+	.empty-message {
+		font-size: var(--font-size-lg);
+		color: var(--color-text-muted);
+		margin-bottom: var(--space-6);
+	}
+</style>

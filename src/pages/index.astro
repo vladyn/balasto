@@ -1,0 +1,219 @@
+---
+import { getEmDashCollection, getSiteSettings, getTermsForEntries } from "emdash";
+import { Image } from "emdash/ui";
+import Base from "../layouts/Base.astro";
+import { resolveStarterSiteIdentity } from "../utils/site-identity";
+
+const { entries: posts, cacheHint } = await getEmDashCollection("posts", {
+	orderBy: { published_at: "desc" },
+	limit: 6,
+});
+const { siteTitle, siteTagline } = resolveStarterSiteIdentity(
+	await getSiteSettings(),
+);
+if (Astro.cache?.enabled) Astro.cache.set(cacheHint);
+
+const [categoriesByEntry, tagsByEntry] = await Promise.all([
+	getTermsForEntries(
+		"posts",
+		posts.map((p) => p.data.id),
+		"category",
+	),
+	getTermsForEntries(
+		"posts",
+		posts.map((p) => p.data.id),
+		"tag",
+	),
+]);
+
+const postsWithTerms = posts.map((post) => ({
+	post,
+	category: categoriesByEntry.get(post.data.id)?.[0],
+	tags: tagsByEntry.get(post.data.id) ?? [],
+}));
+---
+
+<Base title={siteTitle} description={siteTagline}>
+	<section class="home-hero">
+		<span class="hero-eyebrow">Editorial & Insights</span>
+		<h1 class="hero-title">{siteTitle}</h1>
+		{siteTagline && <p class="hero-tagline">{siteTagline}</p>}
+	</section>
+
+	<section class="posts-section">
+		<div class="section-header">
+			<h2 class="section-title">Latest Articles</h2>
+			{posts.length > 0 && <a href="/posts" class="section-more">View all posts &rarr;</a>}
+		</div>
+
+		{
+			postsWithTerms.length === 0 ? (
+				<div class="empty-state">
+					<p class="empty-message">No posts published yet.</p>
+					<a href="/_emdash/admin/content/posts/new" class="btn btn-primary">
+						Create your first post
+					</a>
+				</div>
+			) : (
+				<div class="post-card-grid">
+					{postsWithTerms.map(({ post, category, tags }) => (
+						<article class="post-card">
+							{post.data.featured_image && (
+								<a href={`/posts/${post.id}`} class="post-card-image-wrap" {...post.edit.featured_image}>
+									<Image image={post.data.featured_image} />
+								</a>
+							)}
+							<div class="post-card-body">
+								<div class="post-card-meta">
+									{category && (
+										<a href={`/category/${category.slug}`} class="badge badge-accent">
+											{category.label}
+										</a>
+									)}
+									{post.data.publishedAt && (
+										<time datetime={post.data.publishedAt.toISOString()} class="post-date">
+											{post.data.publishedAt.toLocaleDateString("en-US", {
+												year: "numeric",
+												month: "short",
+												day: "numeric",
+											})}
+										</time>
+									)}
+								</div>
+
+								<h3 class="post-card-title">
+									<a href={`/posts/${post.id}`} {...post.edit.title}>
+										{post.data.title}
+									</a>
+								</h3>
+
+								{post.data.excerpt && (
+									<p class="post-card-excerpt" {...post.edit.excerpt}>
+										{post.data.excerpt}
+									</p>
+								)}
+
+								<div class="post-card-footer">
+									<a href={`/posts/${post.id}`} class="read-more-link">
+										Read article &rarr;
+									</a>
+									{tags.length > 0 && (
+										<span class="post-tag-pill">#{tags[0].label}</span>
+									)}
+								</div>
+							</div>
+						</article>
+					))}
+				</div>
+			)
+		}
+	</section>
+</Base>
+
+<style>
+	.home-hero {
+		padding: var(--space-8) 0 var(--space-12);
+		border-bottom: 1px solid var(--color-border);
+		margin-bottom: var(--space-12);
+	}
+
+	.hero-eyebrow {
+		display: inline-block;
+		font-family: var(--font-display);
+		font-size: var(--font-size-xs);
+		font-weight: var(--font-weight-bold);
+		text-transform: uppercase;
+		letter-spacing: var(--tracking-wider);
+		color: var(--color-accent);
+		margin-bottom: var(--space-3);
+	}
+
+	.hero-title {
+		font-size: var(--font-size-5xl);
+		font-weight: var(--font-weight-extrabold);
+		color: var(--color-primary);
+		line-height: var(--line-height-tight);
+		letter-spacing: var(--tracking-tighter);
+		margin-bottom: var(--space-3);
+	}
+
+	.hero-tagline {
+		font-size: var(--font-size-xl);
+		color: var(--color-text-muted);
+		max-width: 650px;
+		line-height: var(--line-height-normal);
+		margin-bottom: 0;
+	}
+
+	.section-header {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: var(--space-4);
+		margin-bottom: var(--space-8);
+		padding-bottom: var(--space-3);
+		border-bottom: 2px solid var(--color-primary);
+	}
+
+	.section-title {
+		font-size: var(--font-size-2xl);
+		color: var(--color-text-title);
+		font-weight: var(--font-weight-bold);
+	}
+
+	.section-more {
+		font-family: var(--font-display);
+		font-size: var(--font-size-sm);
+		font-weight: var(--font-weight-semibold);
+		color: var(--color-accent);
+	}
+
+	.section-more:hover {
+		color: var(--color-primary);
+	}
+
+	.post-card-meta {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+	}
+
+	.post-date {
+		font-size: var(--font-size-xs);
+		color: var(--color-text-muted);
+		font-family: var(--font-display);
+		font-weight: var(--font-weight-medium);
+	}
+
+	.read-more-link {
+		font-family: var(--font-display);
+		font-size: var(--font-size-xs);
+		font-weight: var(--font-weight-bold);
+		text-transform: uppercase;
+		letter-spacing: var(--tracking-wide);
+		color: var(--color-primary);
+	}
+
+	.post-card:hover .read-more-link {
+		color: var(--color-accent);
+	}
+
+	.post-tag-pill {
+		font-size: var(--font-size-xs);
+		color: var(--color-text-muted);
+	}
+
+	.empty-state {
+		text-align: center;
+		padding: var(--space-16) var(--space-4);
+		background-color: var(--color-surface);
+		border: 1px dashed var(--color-border-strong);
+		border-radius: var(--radius-md);
+	}
+
+	.empty-message {
+		font-size: var(--font-size-lg);
+		color: var(--color-text-muted);
+		margin-bottom: var(--space-6);
+	}
+</style>
