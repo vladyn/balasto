@@ -39,3 +39,4 @@ Thumbs.db
 .netlify
 .cache
 .turbo
+.wrangler/
