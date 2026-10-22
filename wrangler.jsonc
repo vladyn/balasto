@@ -16,6 +16,5 @@
 			"bucket_name": "balasto-media"
 		}
 	],
-	"worker_loaders": [{ "binding": "LOADER" }],
 	"triggers": { "crons": ["* * * * *"] }
 }
